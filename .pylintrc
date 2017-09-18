@@ -1,0 +1,3 @@
+#!text
+[TYPECHECK]
+ignored-modules=wx
