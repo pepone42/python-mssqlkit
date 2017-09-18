@@ -51,9 +51,7 @@ class Server:
             try:
                 cur.execute(sql)
             except Exception as ex:
-                # result_sets.append(resultSet.ResultSet(None,None))
                 self.messages = str(ex)
-                # print("Error: ",type(e)," : ",e)
                 return None
             while True:
 
@@ -65,7 +63,6 @@ class Server:
                     print("Error: ", ex)
                     data = None
 
-                # print(cur.messages)
                 if data is not None:
                     result_sets.append(ResultSet(description, data))
 
