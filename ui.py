@@ -3,6 +3,76 @@
 import wx
 import wx.grid
 import wx.lib.scrolledpanel as scrolled
+import wx.stc
+import threading
+
+"""
+Datagrid: the base grid class
+MultiscrolledGrid: A control that contain multiple grid
+MultiGrid: Contain one Datagrid or one MultiscrolledGrid
+ResultSetGrid: A control that contain MultiGrid and/or a Text aera
+
+"""
+
+
+class DbDataTable(wx.grid.GridTableBase):
+
+    def __init__(self, resultSet):
+        wx.grid.GridTableBase.__init__(self)
+
+        self.resultSet = resultSet
+
+        self.attr = wx.grid.GridCellAttr()
+        self.attr.SetTextColour("black")
+
+        self.nullAttr = wx.grid.GridCellAttr()
+        self.nullAttr.SetTextColour("light grey")
+
+    def GetAttr(self, row: int, col: int, kind):
+        if self.resultSet.data[row][col] is None:
+            self.nullAttr.IncRef()
+            return self.nullAttr
+
+        self.attr.IncRef()
+        return self.attr
+
+    # This is all it takes to make a custom data table to plug into a
+    # wxGrid.  There are many more methods that can be overridden, but
+    # the ones shown below are the required ones.  This table simply
+    # provides strings containing the row and column values.
+
+    def GetColLabelValue(self, col):
+        return str(self.resultSet.description[col][0])
+
+    def GetNumberRows(self):
+        return len(self.resultSet.data)
+
+    def GetNumberCols(self):
+        return len(self.resultSet.description)
+
+    def IsEmptyCell(self, row, col):
+        return False
+
+    def GetValue(self, row, col):
+
+        data = self.resultSet.data[row][col]
+        if data is None:
+            return "null"
+
+        if type(data) is bool:
+            if data is True:
+                return "1"
+            else:
+                return "0"
+
+        data = str(data)
+        # for performance reason, we clamp the size of strings
+        return data[:1000]
+
+    def SetValue(self, row, col, value):
+        # we are readonly
+        pass
+
 
 class DataGrid(wx.grid.Grid):
     """A customized WxWidget Grid with a dbDataTable as datasource"""
@@ -19,8 +89,8 @@ class DataGrid(wx.grid.Grid):
 
         self.EnableDragRowSize(False)
 
-        table = data_table
-        self.SetTable(table, True)
+        self.table = DbDataTable(data_table)
+        self.SetTable(self.table, True)
 
         # resize label height to be consistent with the cells one
         self.SetColLabelSize(self.CellToRect(0, 0)[3])
@@ -30,11 +100,140 @@ class DataGrid(wx.grid.Grid):
         # readOnly
         self.EnableEditing(False)
 
+        self.resize_columns_to_ideal_size(0,100)
+
+        # self.Bind(wx.grid.EVT_GRID_CMD_COL_SIZE,self.best_resize_col)
+        self.Bind(wx.PyEventBinder( wx.grid.wxEVT_GRID_COL_AUTO_SIZE ),self.col_auto_size_event)
+        self.Bind(wx.EVT_KEY_DOWN,self.on_key_down)
+
+    def get_display_value(self,row,col):
+        d = self.table.resultSet.data[row][col]
+        if d is None:
+            return "NULL"
+        elif type(d) is bool:
+            if d is True:
+                return "1"
+            else:
+                return "0"
+        else:
+            return str(d)
+
+    def copy_selection_to_clipboard(self,with_header: bool=False):
+        data=""
+        if with_header:
+            data="\t".join(map(lambda col: str(self.table.resultSet.description[col][0]), self.get_cols_with_selected_cells()))
+            data=data+"\n"
+
+        for row in self.get_rows_with_selected_cells():
+            data=data+"\t".join(map(lambda col: self.get_display_value(row,col), self.get_cols_with_selected_cells()))
+            data+='\n'
+
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.TextDataObject(data))
+            wx.TheClipboard.Close()
+
+    def on_key_down(self, e):
+        if e.GetUnicodeKey() == ord('C') and e.CmdDown():
+            if e.ShiftDown():
+                self.copy_selection_to_clipboard(True)
+            else:
+                self.copy_selection_to_clipboard()
+
+    def get_rows_with_selected_cells(self):
+        # if a column is selected -> return all the rows
+        if len(self.GetSelectedCols())>0:
+            print("Here")
+            return list(range(0,self.table.GetNumberRows()))
+
+        srows = self.GetSelectedRows()
+        for i in self.GetSelectedCells():
+            srows.append(i[0])
+
+        top = self.GetSelectionBlockTopLeft()
+        bottom = self.GetSelectionBlockBottomRight()
+        for i in range(0,len(top)):
+            srows = srows + list(range(top[i][0],bottom[i][0]+1))
+
+        return sorted(list(set(srows)))
+
+    def get_cols_with_selected_cells(self):
+        # if a row is selected -> return all the columns
+        if len(self.GetSelectedRows())>0:
+            print("Here")
+            return list(range(0,self.table.GetNumberCols()))
+
+        scols = self.GetSelectedCols()
+        for i in self.GetSelectedCells():
+            scols.append(i[1])
+
+        top = self.GetSelectionBlockTopLeft()
+        bottom = self.GetSelectionBlockBottomRight()
+        for i in range(0,len(top)):
+            scols = scols + list(range(top[i][1],bottom[i][1]+1))
+
+        return sorted(list(set(scols)))
+
     def SetMinMaxSize(self, size: (int, int)):
         """Clamp the size of the grid to the desired value"""
+        #TODO: if the resultset have less than 400px we don't want the space need for the vertcal scrollbar 
         sbh = wx.SystemSettings.GetMetric(wx.SYS_VSCROLL_X)
         self.SetMaxClientSize((size[0] - sbh, size[1]))
         self.SetMinClientSize((size[0] - sbh, size[1]))
+
+    def get_visible_cells(self):
+        """Get the cells bbox visible in the viewport"""
+        ux, uy = self.GetScrollPixelsPerUnit()
+        sx, sy = self.GetViewStart()
+        w, h = self.GetGridWindow().GetClientSize().Get()
+        sx *= ux ; sy *= uy
+        start_col = self.XToCol(sx)
+        start_row = self.YToRow(sy)
+        end_col = self.XToCol(sx + w, True)
+        end_row = self.YToRow(sy+ h, True)
+        return start_row,end_row,start_col,end_col
+
+    def get_visible_rows(self):
+        """ get the start and end of the visible rows """
+        start,end,_,_ = self.get_visible_cells()
+        return start,end
+
+    def get_label_best_size(self,col):
+        data = str(self.table.resultSet.description[col][0])
+        data = data[:1000]
+        font = self.GetLabelFont()
+        dc = wx.WindowDC(self)
+        dc.SetFont(font)
+        width, height = dc.GetTextExtent(data)
+        return width+12
+
+    def get_cell_best_size(self,row,col):
+        data = str(self.table.resultSet.data[row][col])
+        data = data[:1000]
+        font = self.GetCellFont(row,col)
+        dc = wx.WindowDC(self)
+        dc.SetFont(font)
+        width, height = dc.GetTextExtent(data)
+        return width+12
+
+    def resize_column_to_ideal_size(self, col,start_row = None, end_row = None):
+        if start_row is None:
+            start_row, end_row = self.get_visible_rows()
+        start_row = min(start_row,self.table.GetNumberRows()-1)
+        end_row = min(end_row,self.table.GetNumberRows()-1)
+        
+        max_size = max(self.GetColMinimalAcceptableWidth()+1,self.get_label_best_size(col))
+        for row in range(start_row,end_row+1):
+            s = self.get_cell_best_size(row,col)
+            if s>max_size:
+                max_size = s
+        self.SetColSize(col,max_size)
+
+    def resize_columns_to_ideal_size(self,start_row = None, end_row = None):
+        for col in range(0,self.table.GetNumberCols()):
+            self.resize_column_to_ideal_size(col,start_row,end_row)
+
+    def col_auto_size_event(self, e):
+        self.resize_column_to_ideal_size(e.GetRowOrCol())
 
 
 class _multiScrolledGrid(scrolled.ScrolledPanel):
@@ -47,7 +246,7 @@ class _multiScrolledGrid(scrolled.ScrolledPanel):
         self.grids = []
 
         for r in dataTables:
-            g = dataGrid.DataGrid(self, r)
+            g = DataGrid(self, r)
             self.grids.append(g)
 
             s = parent.GetClientSize()
@@ -59,9 +258,9 @@ class _multiScrolledGrid(scrolled.ScrolledPanel):
         self.SetSizer(vbox)
         self.SetupScrolling(True, True)
         self.Layout()
-        self.Bind(wx.EVT_SIZE, self.OnSize)
+        self.Bind(wx.EVT_SIZE, self.on_size)
 
-    def OnSize(self, event):
+    def on_size(self, event):
         s = self.GetClientSize()
         for g in self.grids:
             g.SetMinMaxSize((s[0], 400))
@@ -74,25 +273,196 @@ class MultiGrid(wx.Panel):
         wx.Panel.__init__(self, parent)
 
         # Sizer
-        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Grid
-        self.grids = self._createGridFromResultset(self, dataTables)
+        self.grids = _create_grid_from_resultset(self, dataTables)
 
-        mainSizer.Add(self.grids, 1, wx.ALL | wx.EXPAND, 0)
+        main_sizer.Add(self.grids, 1, wx.ALL | wx.EXPAND, 0)
 
-        self.SetSizer(mainSizer)
+        self.SetSizer(main_sizer)
         self.Layout()
 
-    def _createGridFromResultset(self, parent, dataTables):
-        if dataTables is None:
-            # No Data?
-            # we return a dummy control then
-            grid = wx.Panel(parent)
-        elif len(dataTables) == 1:
-            # Only one grid to display
-            grid = dataGrid(parent, dataTables[0])
+def _create_grid_from_resultset(parent, data_tables):
+    if data_tables is None:
+        # No Data?
+        # we return a dummy control then
+        grid = wx.Panel(parent)
+    elif len(data_tables) == 1:
+        # Only one grid to display
+        grid = DataGrid(parent, data_tables[0])
+    else:
+        # Multi grid
+        grid = _multiScrolledGrid(parent, data_tables)
+    return grid
+
+class ResultSetGrid(wx.Panel):
+    """ Mutli grid and/or a text message """
+
+    def __init__(self, parent, datatables, message):
+        wx.Panel.__init__(self, parent)
+        # Sizer
+
+        self.vbox = wx.BoxSizer(wx.VERTICAL)
+       
+        self.note_book = wx.Notebook(self)
+        self.vbox.Add(self.note_book, 1, wx.ALL | wx.EXPAND, 0)
+
+        if datatables is not None:
+            self.grid = MultiGrid(self.note_book,datatables)
+            self.note_book.AddPage(self.grid,"Result", True)
+        if message is not None:
+            self.message = wx.TextCtrl(self.note_book,value=message)
+            self.note_book.AddPage(self.message,"Message", False)
+
+        self.infoBar = wx.InfoBar(self)
+        self.infoBar.SetShowHideEffects(wx.SHOW_EFFECT_NONE, wx.SHOW_EFFECT_NONE)
+        self.vbox.Add(self.infoBar, wx.SizerFlags().Expand())
+
+        self.SetSizer(self.vbox)
+        self.Layout()
+
+        self.Show(True)
+
+
+class QueryEditor(wx.Panel):
+    """ Sql editor with query result """
+
+    def __init__(self, parent, with_editor: bool=True):
+        self.srv = None
+        self.is_running = False
+
+        wx.Frame.__init__(self, parent)
+        self.vbox = wx.BoxSizer(wx.VERTICAL)
+        
+        # editor
+        #self.texteditor = wx.stc.StyledTextCtrl(self.splitter)
+        self.with_editor = with_editor
+        if self.with_editor == True:
+            # splitter
+            self.splitter = wx.SplitterWindow(self)
+            self.splitter.SetSashGravity(1.0)
+            
+            self.texteditor = wx.TextCtrl(self.splitter)
+            # TODO: sql styling
+            self.texteditor.Bind(wx.EVT_KEY_DOWN,self.OnKeyDown)
+
+            # Resultset
+            self.result = ResultSetGrid(self.splitter,None,None)
+            
+            self.splitter.SplitHorizontally(self.texteditor, self.result, -150)
+            self.splitter.Unsplit()
+            self.vbox.Add(self.splitter, 1, wx.ALL | wx.EXPAND, 0)
         else:
-            # Multi grid
-            grid = _multiScrolledGrid(parent, dataTables)
-        return grid
+            self.result = ResultSetGrid(self,None,None)
+            self.vbox.Add(self.result, 1, wx.ALL | wx.EXPAND, 0)
+
+        self.SetSizer(self.vbox)
+        self.Layout()
+
+        self.Show(True)
+    
+    def set_result(self, datatables, message):
+        self.is_running = False
+        if self.with_editor == True:
+            new = ResultSetGrid(self.splitter, datatables, message)
+            if self.splitter.IsSplit():
+                # allready splitted, we swap the old result with the new one
+                old = self.result
+                print(str(old)+","+str(new))
+                self.splitter.ReplaceWindow(old,new)
+                self.result = new
+                old.Destroy()
+            else:
+                # not splited -> only the editor is displayed -> with split and add the result control
+                self.splitter.SplitHorizontally(self.texteditor, new, -150)
+                self.result = new
+        else:
+            # no editor mode
+            new = ResultSetGrid(self, datatables, message)
+            self.result.Destroy()   
+            self.result = new
+
+
+    def connect(self,connection):
+        if self.srv is not None:
+            self.srv.close()
+        self.srv = sql.Server(connection)
+
+    def execute_async(self,query):
+        result = self.srv.query(query)
+        wx.CallAfter(self.set_result, result, self.srv.messages)
+
+    def execute(self):
+        query_text = self.texteditor.GetValue()
+        result = self.srv.query(query_text)
+        self.set_result(result,self.srv.messages)
+
+    def OnKeyDown(self, e):
+        # Exec
+        if e.GetKeyCode() == wx.WXK_F5 and not self.is_running:
+            self.is_running = True
+            self.result.infoBar.ShowMessage("...Running....", wx.ICON_NONE)
+            query_text = self.texteditor.GetValue()
+            threading.Thread(target=self.execute_async, args=(query_text,)).start()
+        # cancel
+        if e.GetKeyCode() == wx.WXK_ESCAPE and self.is_running:
+            self.srv.cancel()
+            self.is_running = False
+
+        # propagate the event
+        e.ResumePropagation(1)
+        e.Skip()
+
+
+# class Page:
+#     def __init__(self, parent, title, id, sqlServer):
+#         super().__init__(parent, None, "")
+#         self.connection = sqlServer
+#         self.id = id
+#         self.title = title
+
+class Pager(wx.Panel):
+    def __init__(self, parent):
+        wx.Frame.__init__(self, parent)
+
+        self.vbox = wx.BoxSizer(wx.VERTICAL)
+        self.note_book = wx.Notebook(self)
+
+        self.grids = {}
+
+        self.vbox.Add(self.note_book, 1, wx.ALL | wx.EXPAND, 0)
+
+        self.SetSizer(self.vbox)
+        self.Layout()
+
+        self.Show(True)
+
+    # def newPage(self, title, id, sqlServer):
+    #     self.grids[id] = Page(self.note_book, title, id, sqlServer)
+    #     self.note_book.AddPage(self.grids[id], title, True)
+
+
+
+
+
+
+if __name__ == '__main__':
+    import sql
+
+
+    class MainFrame(wx.Frame):
+        def __init__(self, title):
+            wx.Frame.__init__(self, None, title=title, size=(640, 480))
+            self.res = QueryEditor(self)
+    
+    conn = sql.ConnectionInfo(server="bt1shx0p", instance="btsqlbcmtst2")
+
+    app = wx.App()
+
+
+    frame = MainFrame(title="TdsKit")
+    frame.res.connect(conn)
+
+    frame.Show()
+    app.MainLoop()
