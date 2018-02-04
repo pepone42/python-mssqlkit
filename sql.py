@@ -1,7 +1,11 @@
 """SQLServer connection and query"""
+
+import platform
+
 from collections import namedtuple
 import pytds
 import pytds.login
+
 
 ResultSet = namedtuple("ResultSet", "description data")
 
@@ -18,7 +22,10 @@ class ConnectionInfo:
         self.password = password
         self.trusted_security = False
         if self.user is None:
-            self.trusted_security = True
+            if platform.system() == 'Windows':
+                self.trusted_security = True
+            else:
+                raise Exception("trusted security unsupported")
 
 class Server:
     """A connection to a sql server instance"""
@@ -27,21 +34,35 @@ class Server:
         self.connection_info = connection_info
         self.messages = None
         self.request_cancel = False
-        dsn = self.connection_info.server + "\\" + self.connection_info.instance
+        dsn = None
+        if self.connection_info.instance is not None:
+            dsn = self.connection_info.server + "\\" + self.connection_info.instance
 
         if self.connection_info.trusted_security is True:
             #print("Integrated security" + self.connection_info.server +" " +str(self.connection_info.port) + " " + dsn)
             sspi = pytds.login.SspiAuth(
                 server_name=self.connection_info.server,
                 port=self.connection_info.port)
-            self.conn = pytds.connect(
-                dsn=dsn, database=self.connection_info.database, auth=sspi)
+            if dsn is None:
+                self.conn = pytds.connect(
+                    dsn=dsn, database=self.connection_info.database, auth=sspi)
+            else:
+                self.conn = pytds.connect(
+                    server=self.connection_info.server, database=self.connection_info.database, auth=sspi)
         else:
-            self.conn = pytds.connect(
-                dsn=dsn,
-                database=self.connection_info.database,
-                user=self.connection_info.user,
-                password=self.connection_info.password)
+            if dsn is None:
+                self.conn = pytds.connect(
+                    dsn=dsn,
+                    database=self.connection_info.database,
+                    user=self.connection_info.user,
+                    password=self.connection_info.password)
+            else:
+                self.conn = pytds.connect(
+                    server=self.connection_info.server,
+                    database=self.connection_info.database,
+                    user=self.connection_info.user,
+                    password=self.connection_info.password)
+
 
     def close(self):
         if self.conn._closed():
@@ -95,7 +116,32 @@ class Server:
             return result_sets
 
 if __name__ == '__main__':
-    conn = ConnectionInfo(server="bt1shx0p", instance="btsqlbcmtst2")
+    import sys, getopt
+    # conn = ConnectionInfo(server="bt1shx0p", instance="btsqlbcmtst2")
+    server = None
+    instance = None
+    user = None
+    password = None
+    try:
+        opts, args = getopt.getopt(sys.argv[1:],"S:I:U:P:")
+    except getopt.GetoptError:
+        print('sql.py -S Server [-I <Instance>] [-U User] [-P Password]')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-S':
+            server = arg
+        elif opt == '-I':
+            instance = arg
+        elif opt == '-U':
+            user = arg
+        elif opt == '-P':
+            password = arg
+    print("Server "+str(server))
+    print("Instance "+str(instance))
+    print("User "+str(user))
+    print("Password "+str(password))
+    # conn = ConnectionInfo(server=server, instance=instance, user = user, password= password)
+    conn = ConnectionInfo(server=server, instance = instance ,user = user, password= password)
     srv = Server(conn)
     r = srv.query("select '1'")
     print(r)
