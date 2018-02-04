@@ -117,7 +117,7 @@ class Server:
 
 if __name__ == '__main__':
     import sys, getopt
-    # conn = ConnectionInfo(server="bt1shx0p", instance="btsqlbcmtst2")
+    
     server = None
     instance = None
     user = None
@@ -140,8 +140,9 @@ if __name__ == '__main__':
     print("Instance "+str(instance))
     print("User "+str(user))
     print("Password "+str(password))
-    # conn = ConnectionInfo(server=server, instance=instance, user = user, password= password)
     conn = ConnectionInfo(server=server, instance = instance ,user = user, password= password)
     srv = Server(conn)
     r = srv.query("select '1'")
     print(r)
+
+
