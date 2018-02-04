@@ -321,7 +321,7 @@ class ResultSetGrid(wx.Panel):
             self.grid = MultiGrid(self.note_book,datatables)
             self.note_book.AddPage(self.grid,"Result", True)
         if message is not None:
-            self.message = wx.TextCtrl(self.note_book,value=message)
+            self.message = wx.TextCtrl(self.note_book,value=message, style=wx.TE_MULTILINE|wx.TE_READONLY)
             self.note_book.AddPage(self.message,"Message", False)
 
         self.infoBar = wx.InfoBar(self)
