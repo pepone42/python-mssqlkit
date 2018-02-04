@@ -88,7 +88,8 @@ class DataGrid(wx.grid.Grid):
                                   wx.EmptyString))
 
         self.EnableDragRowSize(False)
-
+        self.EnableEditing(False)
+        self.EnableCellEditControl(False)
         self.table = DbDataTable(data_table)
         self.SetTable(self.table, True)
 
@@ -105,6 +106,14 @@ class DataGrid(wx.grid.Grid):
         # self.Bind(wx.grid.EVT_GRID_CMD_COL_SIZE,self.best_resize_col)
         self.Bind(wx.PyEventBinder( wx.grid.wxEVT_GRID_COL_AUTO_SIZE ),self.col_auto_size_event)
         self.Bind(wx.EVT_KEY_DOWN,self.on_key_down)
+        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.onSelectCell, self)
+
+
+    def onSelectCell(self, evt):
+        row = evt.GetRow()
+        col = evt.GetCol()
+        self.SelectBlock ( row, col, row, col)
+        evt.Skip()
 
     def get_display_value(self,row,col):
         d = self.table.resultSet.data[row][col]
@@ -448,6 +457,7 @@ class Pager(wx.Panel):
 
 
 if __name__ == '__main__':
+    import sys, getopt
     import sql
 
 
@@ -456,7 +466,27 @@ if __name__ == '__main__':
             wx.Frame.__init__(self, None, title=title, size=(640, 480))
             self.res = QueryEditor(self)
     
-    conn = sql.ConnectionInfo(server="bt1shx0p", instance="btsqlbcmtst2")
+
+    server = None
+    instance = None
+    user = None
+    password = None
+    try:
+        opts, args = getopt.getopt(sys.argv[1:],"S:I:U:P:")
+    except getopt.GetoptError:
+        print('sql.py -S Server [-I <Instance>] [-U User] [-P Password]')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-S':
+            server = arg
+        elif opt == '-I':
+            instance = arg
+        elif opt == '-U':
+            user = arg
+        elif opt == '-P':
+            password = arg
+
+    conn = sql.ConnectionInfo(server=server, instance = instance ,user = user, password= password)
 
     app = wx.App()
 
