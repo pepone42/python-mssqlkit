@@ -83,13 +83,11 @@ class DataGrid(wx.grid.Grid):
         self.SetLabelFont(wx.Font(wx.NORMAL_FONT.GetPointSize(),
                                   wx.FONTFAMILY_DEFAULT,
                                   wx.FONTSTYLE_NORMAL,
-                                  wx.FONTWEIGHT_LIGHT,
+                                  wx.FONTWEIGHT_NORMAL,
                                   False,
                                   wx.EmptyString))
 
         self.EnableDragRowSize(False)
-        self.EnableEditing(False)
-        self.EnableCellEditControl(False)
         self.table = DbDataTable(data_table)
         self.SetTable(self.table, True)
 
@@ -100,22 +98,23 @@ class DataGrid(wx.grid.Grid):
 
         # readOnly
         self.EnableEditing(False)
+        self.EnableCellEditControl(False)
 
-        self.resize_columns_to_ideal_size(0,100)
+        self.resize_columns_to_ideal_size(0, 100)
 
-        # self.Bind(wx.grid.EVT_GRID_CMD_COL_SIZE,self.best_resize_col)
-        self.Bind(wx.PyEventBinder( wx.grid.wxEVT_GRID_COL_AUTO_SIZE ),self.col_auto_size_event)
-        self.Bind(wx.EVT_KEY_DOWN,self.on_key_down)
+        # Event handling
+        self.Bind(wx.PyEventBinder(wx.grid.wxEVT_GRID_COL_AUTO_SIZE),
+                  self.col_auto_size_event)
+        self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.onSelectCell, self)
-
 
     def onSelectCell(self, evt):
         row = evt.GetRow()
         col = evt.GetCol()
-        self.SelectBlock ( row, col, row, col)
+        self.SelectBlock(row, col, row, col)
         evt.Skip()
 
-    def get_display_value(self,row,col):
+    def get_display_value(self, row, col):
         d = self.table.resultSet.data[row][col]
         if d is None:
             return "NULL"
@@ -127,32 +126,43 @@ class DataGrid(wx.grid.Grid):
         else:
             return str(d)
 
-    def copy_selection_to_clipboard(self,with_header: bool=False):
-        data=""
+    def copy_selection_to_clipboard(self, with_header: bool = False):
+        data = ""
         if with_header:
-            data="\t".join(map(lambda col: str(self.table.resultSet.description[col][0]), self.get_cols_with_selected_cells()))
-            data=data+"\n"
+            data = "\t".join(map(lambda col:
+                                 str(self.table.resultSet.description[col][0]), self.get_cols_with_selected_cells()))
+            data = data+"\n"
 
         for row in self.get_rows_with_selected_cells():
-            data=data+"\t".join(map(lambda col: self.get_display_value(row,col), self.get_cols_with_selected_cells()))
-            data+='\n'
+            data = data+"\t".join(
+                map(lambda col:
+                    self.get_display_value(row, col),
+                    self.get_cols_with_selected_cells()))
+            data += '\n'
 
         if wx.TheClipboard.Open():
             wx.TheClipboard.SetData(wx.TextDataObject(data))
             wx.TheClipboard.Close()
 
     def on_key_down(self, e):
+
         if e.GetUnicodeKey() == ord('C') and e.CmdDown():
             if e.ShiftDown():
                 self.copy_selection_to_clipboard(True)
             else:
                 self.copy_selection_to_clipboard()
+            e.Skip()
+            return
+
+        # propagate the event
+        e.ResumePropagation(1)
+        e.Skip()
 
     def get_rows_with_selected_cells(self):
         # if a column is selected -> return all the rows
-        if len(self.GetSelectedCols())>0:
+        if len(self.GetSelectedCols()) > 0:
             print("Here")
-            return list(range(0,self.table.GetNumberRows()))
+            return list(range(0, self.table.GetNumberRows()))
 
         srows = self.GetSelectedRows()
         for i in self.GetSelectedCells():
@@ -160,16 +170,15 @@ class DataGrid(wx.grid.Grid):
 
         top = self.GetSelectionBlockTopLeft()
         bottom = self.GetSelectionBlockBottomRight()
-        for i in range(0,len(top)):
-            srows = srows + list(range(top[i][0],bottom[i][0]+1))
+        for i in range(0, len(top)):
+            srows = srows + list(range(top[i][0], bottom[i][0]+1))
 
         return sorted(list(set(srows)))
 
     def get_cols_with_selected_cells(self):
         # if a row is selected -> return all the columns
-        if len(self.GetSelectedRows())>0:
-            print("Here")
-            return list(range(0,self.table.GetNumberCols()))
+        if len(self.GetSelectedRows()) > 0:
+            return list(range(0, self.table.GetNumberCols()))
 
         scols = self.GetSelectedCols()
         for i in self.GetSelectedCells():
@@ -177,14 +186,15 @@ class DataGrid(wx.grid.Grid):
 
         top = self.GetSelectionBlockTopLeft()
         bottom = self.GetSelectionBlockBottomRight()
-        for i in range(0,len(top)):
-            scols = scols + list(range(top[i][1],bottom[i][1]+1))
+        for i in range(0, len(top)):
+            scols = scols + list(range(top[i][1], bottom[i][1]+1))
 
         return sorted(list(set(scols)))
 
     def SetMinMaxSize(self, size: (int, int)):
         """Clamp the size of the grid to the desired value"""
-        #TODO: if the resultset have less than 400px we don't want the space need for the vertcal scrollbar 
+        # TODO: if the resultset have less than 400px we don't want 
+        # the space need for the vertcal scrollbar
         sbh = wx.SystemSettings.GetMetric(wx.SYS_VSCROLL_X)
         self.SetMaxClientSize((size[0] - sbh, size[1]))
         self.SetMinClientSize((size[0] - sbh, size[1]))
@@ -194,19 +204,20 @@ class DataGrid(wx.grid.Grid):
         ux, uy = self.GetScrollPixelsPerUnit()
         sx, sy = self.GetViewStart()
         w, h = self.GetGridWindow().GetClientSize().Get()
-        sx *= ux ; sy *= uy
+        sx *= ux
+        sy *= uy
         start_col = self.XToCol(sx)
         start_row = self.YToRow(sy)
         end_col = self.XToCol(sx + w, True)
-        end_row = self.YToRow(sy+ h, True)
-        return start_row,end_row,start_col,end_col
+        end_row = self.YToRow(sy + h, True)
+        return start_row, end_row, start_col, end_col
 
     def get_visible_rows(self):
         """ get the start and end of the visible rows """
-        start,end,_,_ = self.get_visible_cells()
-        return start,end
+        start, end, _, _ = self.get_visible_cells()
+        return start, end
 
-    def get_label_best_size(self,col):
+    def get_label_best_size(self, col):
         data = str(self.table.resultSet.description[col][0])
         data = data[:1000]
         font = self.GetLabelFont()
@@ -215,31 +226,32 @@ class DataGrid(wx.grid.Grid):
         width, height = dc.GetTextExtent(data)
         return width+12
 
-    def get_cell_best_size(self,row,col):
+    def get_cell_best_size(self, row, col):
         data = str(self.table.resultSet.data[row][col])
         data = data[:1000]
-        font = self.GetCellFont(row,col)
+        font = self.GetCellFont(row, col)
         dc = wx.WindowDC(self)
         dc.SetFont(font)
         width, height = dc.GetTextExtent(data)
         return width+12
 
-    def resize_column_to_ideal_size(self, col,start_row = None, end_row = None):
+    def resize_column_to_ideal_size(self, col, start_row=None, end_row=None):
         if start_row is None:
             start_row, end_row = self.get_visible_rows()
-        start_row = min(start_row,self.table.GetNumberRows()-1)
-        end_row = min(end_row,self.table.GetNumberRows()-1)
-        
-        max_size = max(self.GetColMinimalAcceptableWidth()+1,self.get_label_best_size(col))
-        for row in range(start_row,end_row+1):
-            s = self.get_cell_best_size(row,col)
-            if s>max_size:
-                max_size = s
-        self.SetColSize(col,max_size)
+        start_row = min(start_row, self.table.GetNumberRows()-1)
+        end_row = min(end_row, self.table.GetNumberRows()-1)
 
-    def resize_columns_to_ideal_size(self,start_row = None, end_row = None):
-        for col in range(0,self.table.GetNumberCols()):
-            self.resize_column_to_ideal_size(col,start_row,end_row)
+        max_size = max(self.GetColMinimalAcceptableWidth() +
+                       1, self.get_label_best_size(col))
+        for row in range(start_row, end_row+1):
+            s = self.get_cell_best_size(row, col)
+            if s > max_size:
+                max_size = s
+        self.SetColSize(col, max_size)
+
+    def resize_columns_to_ideal_size(self, start_row=None, end_row=None):
+        for col in range(0, self.table.GetNumberCols()):
+            self.resize_column_to_ideal_size(col, start_row, end_row)
 
     def col_auto_size_event(self, e):
         self.resize_column_to_ideal_size(e.GetRowOrCol())
@@ -292,6 +304,7 @@ class MultiGrid(wx.Panel):
         self.SetSizer(main_sizer)
         self.Layout()
 
+
 def _create_grid_from_resultset(parent, data_tables):
     if data_tables is None:
         # No Data?
@@ -305,6 +318,7 @@ def _create_grid_from_resultset(parent, data_tables):
         grid = _multiScrolledGrid(parent, data_tables)
     return grid
 
+
 class ResultSetGrid(wx.Panel):
     """ Mutli grid and/or a text message """
 
@@ -313,19 +327,21 @@ class ResultSetGrid(wx.Panel):
         # Sizer
 
         self.vbox = wx.BoxSizer(wx.VERTICAL)
-       
+
         self.note_book = wx.Notebook(self)
         self.vbox.Add(self.note_book, 1, wx.ALL | wx.EXPAND, 0)
 
         if datatables is not None:
-            self.grid = MultiGrid(self.note_book,datatables)
-            self.note_book.AddPage(self.grid,"Result", True)
+            self.grid = MultiGrid(self.note_book, datatables)
+            self.note_book.AddPage(self.grid, "Result", True)
         if message is not None:
-            self.message = wx.TextCtrl(self.note_book,value=message, style=wx.TE_MULTILINE|wx.TE_READONLY)
-            self.note_book.AddPage(self.message,"Message", False)
+            self.message = wx.TextCtrl(
+                self.note_book, value=message, style=wx.TE_MULTILINE | wx.TE_READONLY)
+            self.note_book.AddPage(self.message, "Message", False)
 
         self.infoBar = wx.InfoBar(self)
-        self.infoBar.SetShowHideEffects(wx.SHOW_EFFECT_NONE, wx.SHOW_EFFECT_NONE)
+        self.infoBar.SetShowHideEffects(
+            wx.SHOW_EFFECT_NONE, wx.SHOW_EFFECT_NONE)
         self.vbox.Add(self.infoBar, wx.SizerFlags().Expand())
 
         self.SetSizer(self.vbox)
@@ -343,7 +359,7 @@ class QueryEditor(wx.Panel):
 
         wx.Frame.__init__(self, parent)
         self.vbox = wx.BoxSizer(wx.VERTICAL)
-        
+
         # editor
         #self.texteditor = wx.stc.StyledTextCtrl(self.splitter)
         self.with_editor = with_editor
@@ -351,26 +367,26 @@ class QueryEditor(wx.Panel):
             # splitter
             self.splitter = wx.SplitterWindow(self)
             self.splitter.SetSashGravity(1.0)
-            
-            self.texteditor = wx.TextCtrl(self.splitter)
+
+            self.texteditor = wx.TextCtrl(self.splitter, style=wx.TE_MULTILINE)
             # TODO: sql styling
-            self.texteditor.Bind(wx.EVT_KEY_DOWN,self.OnKeyDown)
+            self.texteditor.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
 
             # Resultset
-            self.result = ResultSetGrid(self.splitter,None,None)
-            
+            self.result = ResultSetGrid(self.splitter, None, None)
+
             self.splitter.SplitHorizontally(self.texteditor, self.result, -150)
             self.splitter.Unsplit()
             self.vbox.Add(self.splitter, 1, wx.ALL | wx.EXPAND, 0)
         else:
-            self.result = ResultSetGrid(self,None,None)
+            self.result = ResultSetGrid(self, None, None)
             self.vbox.Add(self.result, 1, wx.ALL | wx.EXPAND, 0)
 
         self.SetSizer(self.vbox)
         self.Layout()
 
         self.Show(True)
-    
+
     def set_result(self, datatables, message):
         self.is_running = False
         if self.with_editor == True:
@@ -379,7 +395,7 @@ class QueryEditor(wx.Panel):
                 # allready splitted, we swap the old result with the new one
                 old = self.result
                 print(str(old)+","+str(new))
-                self.splitter.ReplaceWindow(old,new)
+                self.splitter.ReplaceWindow(old, new)
                 self.result = new
                 old.Destroy()
             else:
@@ -389,23 +405,22 @@ class QueryEditor(wx.Panel):
         else:
             # no editor mode
             new = ResultSetGrid(self, datatables, message)
-            self.result.Destroy()   
+            self.result.Destroy()
             self.result = new
 
-
-    def connect(self,connection):
+    def connect(self, connection):
         if self.srv is not None:
             self.srv.close()
         self.srv = sql.Server(connection)
 
-    def execute_async(self,query):
+    def execute_async(self, query):
         result = self.srv.query(query)
         wx.CallAfter(self.set_result, result, self.srv.messages)
 
     def execute(self):
         query_text = self.texteditor.GetValue()
         result = self.srv.query(query_text)
-        self.set_result(result,self.srv.messages)
+        self.set_result(result, self.srv.messages)
 
     def OnKeyDown(self, e):
         # Exec
@@ -413,7 +428,8 @@ class QueryEditor(wx.Panel):
             self.is_running = True
             self.result.infoBar.ShowMessage("...Running....", wx.ICON_NONE)
             query_text = self.texteditor.GetValue()
-            threading.Thread(target=self.execute_async, args=(query_text,)).start()
+            threading.Thread(target=self.execute_async,
+                             args=(query_text,)).start()
         # cancel
         if e.GetKeyCode() == wx.WXK_ESCAPE and self.is_running:
             self.srv.cancel()
@@ -452,27 +468,22 @@ class Pager(wx.Panel):
     #     self.note_book.AddPage(self.grids[id], title, True)
 
 
-
-
-
-
 if __name__ == '__main__':
-    import sys, getopt
+    import sys
+    import getopt
     import sql
-
 
     class MainFrame(wx.Frame):
         def __init__(self, title):
             wx.Frame.__init__(self, None, title=title, size=(640, 480))
             self.res = QueryEditor(self)
-    
 
     server = None
     instance = None
     user = None
     password = None
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"S:I:U:P:")
+        opts, args = getopt.getopt(sys.argv[1:], "S:I:U:P:")
     except getopt.GetoptError:
         print('sql.py -S Server [-I <Instance>] [-U User] [-P Password]')
         sys.exit(2)
@@ -486,10 +497,10 @@ if __name__ == '__main__':
         elif opt == '-P':
             password = arg
 
-    conn = sql.ConnectionInfo(server=server, instance = instance ,user = user, password= password)
+    conn = sql.ConnectionInfo(
+        server=server, instance=instance, user=user, password=password)
 
     app = wx.App()
-
 
     frame = MainFrame(title="TdsKit")
     frame.res.connect(conn)
