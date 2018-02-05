@@ -23,6 +23,7 @@ class ConnectionInfo:
         self.trusted_security = False
         if self.user is None:
             if platform.system() == 'Windows':
+                print("Using windows authentication")
                 self.trusted_security = True
             else:
                 raise Exception("trusted security unsupported")
@@ -43,14 +44,14 @@ class Server:
             sspi = pytds.login.SspiAuth(
                 server_name=self.connection_info.server,
                 port=self.connection_info.port)
-            if dsn is None:
+            if dsn is not None:
                 self.conn = pytds.connect(
                     dsn=dsn, database=self.connection_info.database, auth=sspi)
             else:
                 self.conn = pytds.connect(
                     server=self.connection_info.server, database=self.connection_info.database, auth=sspi)
         else:
-            if dsn is None:
+            if dsn is not None:
                 self.conn = pytds.connect(
                     dsn=dsn,
                     database=self.connection_info.database,
