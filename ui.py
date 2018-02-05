@@ -5,6 +5,7 @@ import wx.grid
 import wx.lib.scrolledpanel as scrolled
 import wx.stc
 import threading
+import platform
 
 """
 Datagrid: the base grid class
@@ -69,9 +70,9 @@ class DbDataTable(wx.grid.GridTableBase):
         # for performance reason, we clamp the size of strings
         return data[:1000]
 
-    def SetValue(self, row, col, value):
-        # we are readonly
-        pass
+    # def SetValue(self, row, col, value):
+    #     # we are readonly
+    #     pass
 
 
 class DataGrid(wx.grid.Grid):
@@ -106,9 +107,24 @@ class DataGrid(wx.grid.Grid):
         self.Bind(wx.PyEventBinder(wx.grid.wxEVT_GRID_COL_AUTO_SIZE),
                   self.col_auto_size_event)
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
-        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.onSelectCell, self)
+        self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.grid_select_cell_event, self)
+        if platform.system() == "Linux":
+            self.hidden_panel = wx.Panel(parent,pos = self.GetPosition(), size = self.GetSize())
+            self.hidden_panel.Show()
+            self.hidden_panel.Bind(wx.EVT_MOUSE_EVENTS,self.mousewheel_event)
+            print("Linux!")
+            # for child in self.GetChildren():
+            #     print(child.GetName()+" "+str(child))
+            #     child.Bind(wx.EVT_MOUSE_EVENTS,self.mousewheel_event)
+                
 
-    def onSelectCell(self, evt):
+
+    def mousewheel_event(self, e):
+        print("Mousewheel!")
+        e.Skip()
+
+    def grid_select_cell_event(self, evt):
+        print("Select!")
         row = evt.GetRow()
         col = evt.GetCol()
         self.SelectBlock(row, col, row, col)
@@ -254,6 +270,7 @@ class DataGrid(wx.grid.Grid):
             self.resize_column_to_ideal_size(col, start_row, end_row)
 
     def col_auto_size_event(self, e):
+        print("col_auto_size_event")
         self.resize_column_to_ideal_size(e.GetRowOrCol())
 
 
@@ -500,7 +517,11 @@ if __name__ == '__main__':
     conn = sql.ConnectionInfo(
         server=server, instance=instance, user=user, password=password)
 
+    
+
     app = wx.App()
+
+    print(wx.PlatformInformation.Get().GetToolkitMajorVersion())
 
     frame = MainFrame(title="TdsKit")
     frame.res.connect(conn)
