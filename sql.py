@@ -8,6 +8,7 @@ import pytds.login
 
 
 ResultSet = namedtuple("ResultSet", "description data")
+Metadata = namedtuple("Metadata",("Databases",  "UserTypes", "Objects"))
 
 class ConnectionInfo:
     """Describe how to connect to a sql server instance"""
@@ -28,6 +29,25 @@ class ConnectionInfo:
             else:
                 raise Exception("trusted security unsupported")
 
+
+
+class MetadataCache:
+    """ cache metadata for a server """
+
+    def __init__(self):
+        self.servers = {}
+
+    def new_server(self, connection_info: ConnectionInfo):
+        self.dsn = connection_info.server
+        if connection_info.instance is not None:
+            dsn = connection_info.server + "\\" + connection_info.instance
+        if dsn not in self.servers:
+            srv = Server(connection_info)
+            databases = srv.get_databases()
+            user_types = srv.get_user_types()
+            self.servers[dsn] = Metadata(databases, user_types, None)
+            srv.close()
+
 class Server:
     """A connection to a sql server instance"""
 
@@ -35,6 +55,8 @@ class Server:
         self.connection_info = connection_info
         self.messages = None
         self.request_cancel = False
+        self._databases = None
+        self._user_types = None
         dsn = None
         if self.connection_info.instance is not None:
             dsn = self.connection_info.server + "\\" + self.connection_info.instance
@@ -66,11 +88,32 @@ class Server:
 
 
     def close(self):
-        if self.conn._closed():
+        if not self.conn._closed:
             self.conn.close()
 
     def cancel(self):
         self.request_cancel = True
+
+    def get_database(self):
+        with self.conn.cursor() as cur:
+            return cur.execute_scalar('select db_name()')
+
+    def get_databases(self):
+        if self._databases is None:
+            res = self.query("SELECT name FROM master.sys.databases")
+            self._databases = list(map(lambda r: r[0],res[0].data))
+        return self._databases
+
+    def get_user_types(self):
+        if self._user_types is None:
+            types = {}
+            for db in self.get_databases():
+                types[db] = {}
+                res = self.query("SELECT name,user_type_id FROM ["+db+"].sys.types")
+                for r in res[0].data:
+                    types[db][r[1]]=r[0]
+            self._user_types = types
+        return self._user_types
 
     def query(self, sql):
         """execute the sql query and return an array of resultset"""

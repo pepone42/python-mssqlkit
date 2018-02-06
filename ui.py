@@ -29,6 +29,7 @@ class DbDataTable(wx.grid.GridTableBase):
         self.nullAttr = wx.grid.GridCellAttr()
         self.nullAttr.SetTextColour("light grey")
 
+
     def GetAttr(self, row: int, col: int, kind):
         if self.resultSet.data[row][col] is None:
             self.nullAttr.IncRef()
@@ -108,6 +109,13 @@ class DataGrid(wx.grid.Grid):
                   self.col_auto_size_event)
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Bind(wx.grid.EVT_GRID_SELECT_CELL, self.grid_select_cell_event, self)
+        self.Bind(wx.grid.EVT_GRID_CELL_RIGHT_CLICK, self.show_popup_menu)
+
+        self.popup_copy_id = wx.NewId()
+        self.popup_copy_with_header_id = wx.NewId()
+        self.popup_copy_header_id = wx.NewId()
+        self.Bind(wx.EVT_MENU, self.menu_event)
+
         if platform.system() == "Linux":
             self.hidden_panel = wx.Panel(parent,pos = self.GetPosition(), size = self.GetSize())
             self.hidden_panel.Show()
@@ -116,7 +124,26 @@ class DataGrid(wx.grid.Grid):
             # for child in self.GetChildren():
             #     print(child.GetName()+" "+str(child))
             #     child.Bind(wx.EVT_MOUSE_EVENTS,self.mousewheel_event)
-                
+    def menu_event(self, e):
+        print("Menu event "+str(e.GetId() ))
+        
+        i = e.GetId()
+        if i == self.popup_copy_id:
+            print(str(self.popup_copy_id))
+            self.copy_selection_to_clipboard()
+        elif i == self.popup_copy_with_header_id:
+            self.copy_selection_to_clipboard(True)
+        elif i == self.popup_copy_header_id:
+            self.copy_selected_headers_to_clipboard()
+
+    def show_popup_menu(self, event):
+        menu = wx.Menu()
+        menu.Append(self.popup_copy_id, "Copy\tCtrl+c")
+        menu.Append(self.popup_copy_with_header_id, "Copy with headers\tCtrl-Shift-c")
+        menu.Append(self.popup_copy_header_id, "Copy headers")
+
+        self.PopupMenu(menu)
+        menu.Destroy()
 
 
     def mousewheel_event(self, e):
@@ -124,7 +151,6 @@ class DataGrid(wx.grid.Grid):
         e.Skip()
 
     def grid_select_cell_event(self, evt):
-        print("Select!")
         row = evt.GetRow()
         col = evt.GetCol()
         self.SelectBlock(row, col, row, col)
@@ -141,6 +167,15 @@ class DataGrid(wx.grid.Grid):
                 return "0"
         else:
             return str(d)
+
+    def copy_selected_headers_to_clipboard(self):
+        data = ""
+        data = "\t".join(map(lambda col:
+                             str(self.table.resultSet.description[col][0]), self.get_cols_with_selected_cells()))
+        data = data+"\n"
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(wx.TextDataObject(data))
+            wx.TheClipboard.Close()
 
     def copy_selection_to_clipboard(self, with_header: bool = False):
         data = ""
@@ -373,6 +408,7 @@ class QueryEditor(wx.Panel):
     def __init__(self, parent, with_editor: bool=True):
         self.srv = None
         self.is_running = False
+        self.metadata_cache = sql.MetadataCache()
 
         wx.Frame.__init__(self, parent)
         self.vbox = wx.BoxSizer(wx.VERTICAL)
@@ -429,10 +465,15 @@ class QueryEditor(wx.Panel):
         if self.srv is not None:
             self.srv.close()
         self.srv = sql.Server(connection)
+        
+        self.metadata_cache.new_server(connection)
+        print(self.metadata_cache.servers)
 
     def execute_async(self, query):
         result = self.srv.query(query)
         wx.CallAfter(self.set_result, result, self.srv.messages)
+        print("Databses: "+",".join(self.srv.get_databases()))
+        self.srv.get_user_types()
 
     def execute(self):
         query_text = self.texteditor.GetValue()
@@ -516,6 +557,7 @@ if __name__ == '__main__':
 
     conn = sql.ConnectionInfo(
         server=server, instance=instance, user=user, password=password)
+
 
     
 
