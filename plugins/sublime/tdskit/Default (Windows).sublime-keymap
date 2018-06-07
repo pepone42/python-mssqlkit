@@ -1,0 +1,5 @@
+[
+	{ "keys": ["f5"], "command": "tds_query" },
+	{ "keys": ["ctrl+f5"], "command": "tds_connect" },
+	{ "keys": ["f12"], "command": "tds_script_object" },
+]

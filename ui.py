@@ -7,6 +7,8 @@ import wx.stc
 import threading
 import platform
 
+import sql
+
 """
 Datagrid: the base grid class
 MultiscrolledGrid: A control that contain multiple grid
@@ -44,6 +46,7 @@ class DbDataTable(wx.grid.GridTableBase):
     # provides strings containing the row and column values.
 
     def GetColLabelValue(self, col):
+        #return str(self.resultSet.description[col][0]+'\n'+self.resultSet.description[col][7])
         return str(self.resultSet.description[col][0])
 
     def GetNumberRows(self):
@@ -89,6 +92,8 @@ class DataGrid(wx.grid.Grid):
                                   False,
                                   wx.EmptyString))
 
+        self.SetCellHighlightPenWidth(1)
+
         self.EnableDragRowSize(False)
         self.table = DbDataTable(data_table)
         self.SetTable(self.table, True)
@@ -124,6 +129,7 @@ class DataGrid(wx.grid.Grid):
             # for child in self.GetChildren():
             #     print(child.GetName()+" "+str(child))
             #     child.Bind(wx.EVT_MOUSE_EVENTS,self.mousewheel_event)
+
     def menu_event(self, e):
         print("Menu event "+str(e.GetId() ))
         
@@ -408,7 +414,7 @@ class QueryEditor(wx.Panel):
     def __init__(self, parent, with_editor: bool=True):
         self.srv = None
         self.is_running = False
-        self.metadata_cache = sql.MetadataCache()
+        # self.metadata_cache = sql.MetadataCache()
 
         wx.Frame.__init__(self, parent)
         self.vbox = wx.BoxSizer(wx.VERTICAL)
@@ -421,7 +427,7 @@ class QueryEditor(wx.Panel):
             self.splitter = wx.SplitterWindow(self)
             self.splitter.SetSashGravity(1.0)
 
-            self.texteditor = wx.TextCtrl(self.splitter, style=wx.TE_MULTILINE)
+            self.texteditor = wx.TextCtrl(self.splitter, style=wx.TE_MULTILINE|wx.TE_RICH2)
             # TODO: sql styling
             self.texteditor.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
 
@@ -453,32 +459,43 @@ class QueryEditor(wx.Panel):
                 old.Destroy()
             else:
                 # not splited -> only the editor is displayed -> with split and add the result control
+            
                 self.splitter.SplitHorizontally(self.texteditor, new, -150)
                 self.result = new
         else:
             # no editor mode
             new = ResultSetGrid(self, datatables, message)
-            self.result.Destroy()
+            old = self.result
+            self.vbox.Replace(old,new)
+            old.Destroy()
             self.result = new
+            self.Layout()
 
     def connect(self, connection):
         if self.srv is not None:
             self.srv.close()
         self.srv = sql.Server(connection)
-        
-        self.metadata_cache.new_server(connection)
-        print(self.metadata_cache.servers)
+        # print(sql.MetadataCache.servers)
 
-    def execute_async(self, query):
+    def _execute_async(self, query):
         result = self.srv.query(query)
         wx.CallAfter(self.set_result, result, self.srv.messages)
-        print("Databses: "+",".join(self.srv.get_databases()))
-        self.srv.get_user_types()
 
     def execute(self):
         query_text = self.texteditor.GetValue()
         result = self.srv.query(query_text)
         self.set_result(result, self.srv.messages)
+
+    def execute_async(self, query):
+        self.is_running = True
+        self.result.infoBar.ShowMessage("...Running....", wx.ICON_NONE)
+        threading.Thread(target=self._execute_async,
+                            args=(query,)).start()
+
+    def cancel(self):
+        if self.is_running:
+            self.srv.cancel()
+            self.is_running = False
 
     def OnKeyDown(self, e):
         # Exec
@@ -486,7 +503,7 @@ class QueryEditor(wx.Panel):
             self.is_running = True
             self.result.infoBar.ShowMessage("...Running....", wx.ICON_NONE)
             query_text = self.texteditor.GetValue()
-            threading.Thread(target=self.execute_async,
+            threading.Thread(target=self._execute_async,
                              args=(query_text,)).start()
         # cancel
         if e.GetKeyCode() == wx.WXK_ESCAPE and self.is_running:

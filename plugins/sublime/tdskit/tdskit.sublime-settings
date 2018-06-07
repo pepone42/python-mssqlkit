@@ -1,0 +1,22 @@
+{ 
+	// Available connection list
+	"Connections": 
+	[
+		{
+			// Name of the connection, so you can easily identify them
+			"Name": "Production server 1"
+			, "Server": "ProdServerName"
+			// Instance name
+			, "Instance" : "ProdInstanceName"
+			// Default database 
+			, "DefaultDatabase" : "Customer"
+			},
+		{
+			"Name": "UAT server 2"
+			, "Server": "Carlos"
+			,"Instance" : "Uat1"
+			, "User" : "testUser"
+			, "Password" : "xxxxxx"
+		}
+	]
+}
