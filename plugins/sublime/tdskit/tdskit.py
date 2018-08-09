@@ -3,8 +3,9 @@ import sublime_plugin
 import xmlrpc.client
 import re
 
-xmlrpcclient = xmlrpc.client.ServerProxy('http://127.0.0.1:8000', allow_none=True)
-print("Loaded")
+class tdskit(object):
+    xmlrpcclient = xmlrpc.client.ServerProxy('http://127.0.0.1:8000', allow_none=True)
+
 
 
 def plugin_unloaded():
@@ -20,7 +21,7 @@ def is_connected(view):
     try:
         if view.settings().get("tds_connection_info") is not None:
             print("Try ping")
-            xmlrpcclient.ping()
+            tdskit.xmlrpcclient.ping()
             return True
         print("No")
         return False
@@ -33,7 +34,7 @@ def is_connected(view):
 def tds_connect(view, connection_info):
     c = connection_info
     view.settings().set("tds_connection_info",c)
-    xmlrpcclient.connect(view.id(), c["Server"], c.get("Instance"), c.get("DefaultDatabase"), c.get("User"), c.get("Password"))
+    tdskit.xmlrpcclient.connect(view.id(), c["Server"], c.get("Instance"), c.get("DefaultDatabase"), c.get("User"), c.get("Password"))
     #view.settings.set("tds_connection_info", {"Server": server, "Instance": instance, "DefaultDatabase": db, "User": user, "Password": password})
     #print("Conn info " + str(view.tds_connection_info))
 
@@ -62,7 +63,7 @@ class tds_connectCommand(sublime_plugin.TextCommand):
             con = get_settings("Connections", None)[index]
             print(str(con))
             # self.view.settings().set("tds_connection_info",con)
-            # xmlrpcclient.connect(self.view.id(), con["Server"], con["Instance"], con["DefaultDatabase"])
+            # tdskit.xmlrpcclient.connect(self.view.id(), con["Server"], con["Instance"], con["DefaultDatabase"])
             tds_connect(self.view,con)
 
 
@@ -80,13 +81,13 @@ def get_selection_or_all(view):
 class tds_queryCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         if is_connected(self.view):
-            xmlrpcclient.exec_query_async(self.view.id(), get_selection_or_all(self.view))
+            tdskit.xmlrpcclient.exec_query_async(self.view.id(), get_selection_or_all(self.view))
 
 
 class tds_cancel_queryCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         if is_connected(self.view):
-            xmlrpcclient.cancel(self.view.id())
+            tdskit.xmlrpcclient.cancel(self.view.id())
 
 
 class tds_script_objectCommand(sublime_plugin.TextCommand):
@@ -104,7 +105,7 @@ class tds_script_objectCommand(sublime_plugin.TextCommand):
         con = self.view.settings().get("tds_connection_info")
         # v.settings().set("tds_connection_info",con)
         tds_connect(v, con)
-        xmlrpcclient.switch_to(v.id())
+        tdskit.xmlrpcclient.switch_to(v.id())
         # connect_to_database(v, sqlview.connectionString,sqlview.connectionName)
 
     def run(self, edit):
@@ -117,19 +118,19 @@ class tds_script_objectCommand(sublime_plugin.TextCommand):
                     sch = m.group(1)
                     obj = m.group(2)
 
-                    print(xmlrpcclient.script_object(self.view.id(), sch, obj))
-                    self.open_in_new_view(s, xmlrpcclient.script_object(self.view.id(), sch, obj))
+                    print(tdskit.xmlrpcclient.script_object(self.view.id(), sch, obj))
+                    self.open_in_new_view(s, tdskit.xmlrpcclient.script_object(self.view.id(), sch, obj))
                 else:
-                    print(xmlrpcclient.script_object(self.view.id(), None, s))
-                    self.open_in_new_view(s, xmlrpcclient.script_object(self.view.id(), None, s))
+                    print(tdskit.xmlrpcclient.script_object(self.view.id(), None, s))
+                    self.open_in_new_view(s, tdskit.xmlrpcclient.script_object(self.view.id(), None, s))
 
 
 class MyEvents(sublime_plugin.EventListener):
 
     def on_close(self, view):
         if is_connected(view):
-            xmlrpcclient.delete_view(view.id())
+            tdskit.xmlrpcclient.delete_view(view.id())
 
     def on_activated(self, view):
         if is_connected(view):
-            xmlrpcclient.switch_to(view.id())
+            tdskit.xmlrpcclient.switch_to(view.id())
