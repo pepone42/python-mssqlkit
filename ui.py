@@ -107,7 +107,8 @@ class DataGrid(wx.grid.Grid):
         self.EnableEditing(False)
         self.EnableCellEditControl(False)
 
-        self.resize_columns_to_ideal_size(0, 100)
+        if self.table.RowsCount>0:
+            self.resize_columns_to_ideal_size(0, 100)
 
         # Event handling
         self.Bind(wx.PyEventBinder(wx.grid.wxEVT_GRID_COL_AUTO_SIZE),
