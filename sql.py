@@ -162,9 +162,22 @@ class Server:
                     #         self.request_cancel = False
                     #     data = data + d
                     data = cur.fetchall()
+                # except ProgrammingError as ex:
+                #     if 
+
+                # select @var = 'tto' does not produce any resultset and raised an exception
+                # we catch it and ignore it.
+                # TODO: is there a better way to handle that?
+                except pytds.ProgrammingError as ex:
+                    data = None
+                    if str(ex) == "Previous statement didn't produce any results":
+                        pass
+                    else:
+                        break
+                    
                 except Exception as ex:
                     data = None
-                    self.messages = "Error while fetching data"
+                    self.messages = str(ex) + " Error while fetching data"
                     break
 
 

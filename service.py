@@ -23,7 +23,8 @@ class tdsKitService:
 
     def script_object(self, viewid, schema_name, object_name):
         srv = self.frame.views[viewid].srv
-        return srv.script_object(schema_name,object_name)
+        script = srv.script_object(schema_name,object_name)
+        return script
 
     def delete_view(self, viewid):
         wx.CallAfter(self.frame.delete_view,viewid)
