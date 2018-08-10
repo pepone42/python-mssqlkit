@@ -89,7 +89,8 @@ class MainFrame(wx.Frame):
                 self.views.pop(viewid,None)
                 
                 page = self.choicebook.GetSelection()
-                self.current_viewid = self.choicebook.GetPageText(page)
+                if page != wx.NOT_FOUND:
+                    self.current_viewid = self.choicebook.GetPageText(page)
 
     def cancel_query(self, viewid):
         if viewid in self.views:
