@@ -118,10 +118,10 @@ class tds_script_objectCommand(sublime_plugin.TextCommand):
                     sch = m.group(1)
                     obj = m.group(2)
 
-                    print(tdskit.xmlrpcclient.script_object(self.view.id(), sch, obj))
+                    # print(tdskit.xmlrpcclient.script_object(self.view.id(), sch, obj))
                     self.open_in_new_view(s, tdskit.xmlrpcclient.script_object(self.view.id(), sch, obj))
                 else:
-                    print(tdskit.xmlrpcclient.script_object(self.view.id(), None, s))
+                    # print(tdskit.xmlrpcclient.script_object(self.view.id(), None, s))
                     self.open_in_new_view(s, tdskit.xmlrpcclient.script_object(self.view.id(), None, s))
 
 
