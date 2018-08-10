@@ -129,13 +129,15 @@ class Server:
         return hr_type
 
     def batched_query(self, sql):
+        """execute the sql query by batch and return an array of resultset"""
+
         result_sets = []
         messages = ""
         query = []
         last_query=""
 
         batches = re.split("^\s*(GO(?:\s+[0-9]+)?)\s*(?:--.*)?$",sql,flags=re.M|re.I)
-        print(batches)
+        # print(batches)
         for b in batches:
             if b == "GO":
                 # execute one
@@ -144,13 +146,15 @@ class Server:
             else:
                 match = re.match("^GO\s+([0-9]+)$",b,re.I)
                 if match is not None:
+                    #execute many
                     for i in range(0,int(match.group(1))):
                         query.append(last_query)
                 else:
+                    # not a Go statment
                     last_query = b
         query.append(last_query)
 
-        print(query)
+        # print(query)
         for q in query:
             r = self.query(q)
             if r is not None:
@@ -239,10 +243,13 @@ class Server:
 
             self.cur = None
 
-            if not result_sets:
-                return None
+            # if not result_sets:
+            #     return None
             return result_sets
         
+    def get_current_db(self):
+        return self.query("select db_name()")[0].data[0][0]
+
     def script_object(self, schema_name, object_name):
         query = '''
         declare @script varchar(max),@objectname varchar(500), @schemaname varchar(64);

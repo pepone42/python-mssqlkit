@@ -43,6 +43,10 @@ class tdsKitService:
         wx.CallAfter(self.frame.execute_query_async,viewid,"sp_help '"+object_name+"'")
         return "OK"
 
+    def get_current_db(self, viewid):
+        srv = self.frame.views[viewid].srv
+        return srv.get_current_db()
+
     def ping(self):
         return True
 
@@ -133,12 +137,6 @@ xmlrpcserver = SimpleXMLRPCServer(("localhost", 8000),
 
 app = wx.App()
 frame = MainFrame(title="TdsKit")
-# frame.new_connection(1,server="bt1shx0p",instance="btsqlbcmtst2")
-# frame.execute_query_async(1,"select 1")
-# frame.new_connection(2,server="bt1shx0p",instance="btsqlbcmtst2")
-# frame.execute_query_async(2,"select top 100 * from sys.columns")
-# frame.switch_to(2)
-# frame.Show()
 
 k = tdsKitServiceThread(frame)
 k.start()
