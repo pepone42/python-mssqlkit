@@ -365,7 +365,7 @@ class MultiGrid(wx.Panel):
 
 
 def _create_grid_from_resultset(parent, data_tables):
-    if data_tables is None:
+    if len(data_tables) == 0: # is None:
         # No Data?
         # we return a dummy control then
         grid = wx.Panel(parent)
@@ -390,10 +390,10 @@ class ResultSetGrid(wx.Panel):
         self.note_book = wx.Notebook(self)
         self.vbox.Add(self.note_book, 1, wx.ALL | wx.EXPAND, 0)
 
-        if datatables is not None:
+        if datatables is not None and len(datatables) > 0: # there is Data to display
             self.grid = MultiGrid(self.note_book, datatables)
             self.note_book.AddPage(self.grid, "Result", True)
-        if message is not None:
+        if message is not None: # there is message to display
             self.message = wx.TextCtrl(
                 self.note_book, value=message, style=wx.TE_MULTILINE | wx.TE_READONLY)
             self.note_book.AddPage(self.message, "Message", False)
