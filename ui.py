@@ -479,12 +479,12 @@ class QueryEditor(wx.Panel):
         # print(sql.MetadataCache.servers)
 
     def _execute_async(self, query):
-        result = self.srv.query(query)
+        result = self.srv.batched_query(query)
         wx.CallAfter(self.set_result, result, self.srv.messages)
 
     def execute(self):
         query_text = self.texteditor.GetValue()
-        result = self.srv.query(query_text)
+        result = self.srv.batched_query(query_text)
         self.set_result(result, self.srv.messages)
 
     def execute_async(self, query):

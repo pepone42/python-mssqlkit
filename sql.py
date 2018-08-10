@@ -5,7 +5,7 @@ import platform
 from collections import namedtuple
 import pytds
 import pytds.login
-
+import re
 
 ResultSet = namedtuple("ResultSet", "description data")
 Metadata = namedtuple("Metadata",("Databases",  "SysTypes", "Objects"))
@@ -24,7 +24,7 @@ class ConnectionInfo:
         self.trusted_security = False
         if self.user is None:
             if platform.system() == 'Windows':
-                print("Using windows authentication")
+                # print("Using windows authentication")
                 self.trusted_security = True
             else:
                 raise Exception("trusted security unsupported")
@@ -39,7 +39,7 @@ class MetadataCache:
     def new_server(dsn, databases, sys_types):
         if dsn not in MetadataCache.servers:
             MetadataCache.servers[dsn] = Metadata(databases, sys_types, None)
-            print("New server" + str(MetadataCache.servers[dsn]))
+            # print("New server" + str(MetadataCache.servers[dsn]))
 
 class Server:
     """A connection to a sql server instance"""
@@ -56,7 +56,7 @@ class Server:
             self.dsn = self.connection_info.server + "\\" + self.connection_info.instance
 
         if self.connection_info.trusted_security is True:
-            #print("Integrated security" + self.connection_info.server +" " +str(self.connection_info.port) + " " + dsn)
+            # print("Integrated security" + self.connection_info.server +" " +str(self.connection_info.port) + " " + dsn)
             sspi = pytds.login.SspiAuth(
                 server_name=self.connection_info.server,
                 port=self.connection_info.port)
@@ -90,7 +90,7 @@ class Server:
             try:
                 self.cur.cancel()
             except:
-                print("Who cares")
+                # print("Who cares")
                 pass
             self.messages = "Canceld"
             self.cur = None
@@ -125,17 +125,54 @@ class Server:
         hr_type = "??"
         if type_id in self.metadata().SysTypes:
             hr_type = self.metadata().SysTypes[type_id]
-        print(str(desc) + "=" + hr_type)
+        # print(str(desc) + "=" + hr_type)
         return hr_type
+
+    def batched_query(self, sql):
+        result_sets = []
+        messages = ""
+        query = []
+        last_query=""
+
+        batches = re.split("^\s*(GO(?:\s+[0-9]+)?)\s*(?:--.*)?$",sql,flags=re.M|re.I)
+        print(batches)
+        for b in batches:
+            if b == "GO":
+                # execute one
+                query.append(last_query)
+                continue
+            else:
+                match = re.match("^GO\s+([0-9]+)$",b,re.I)
+                if match is not None:
+                    for i in range(0,int(match.group(1))):
+                        query.append(last_query)
+                else:
+                    last_query = b
+        query.append(last_query)
+
+        print(query)
+        for q in query:
+            r = self.query(q)
+            if r is not None:
+                result_sets.extend(r)
+            messages += self.messages
+
+        self.messages = messages
+        return result_sets
+
 
     def query(self, sql):
         """execute the sql query and return an array of resultset"""
 
+        result_sets = []
+        self.messages = ""
+        messages = ""
+
+        # self.batched_query(sql)
+
         with self.conn.cursor() as cur:
             self.cur = cur
-            result_sets = []
-            self.messages = ""
-            messages = ""
+
             self.request_cancel = False
             try:
                 cur.execute(sql)
@@ -150,7 +187,7 @@ class Server:
                     self.messages = "Error reading description"
                 if self.metadata() is not None and description is not None:
                     description = list(map(lambda c: c+(self._better_description(c),),description))
-                    print(description)
+                    # print(description)
                 try:
                     # data = cur.fetchmany(10000)
                     # while True:
@@ -162,8 +199,6 @@ class Server:
                     #         self.request_cancel = False
                     #     data = data + d
                     data = cur.fetchall()
-                # except ProgrammingError as ex:
-                #     if 
 
                 # select @var = 'tto' does not produce any resultset and raised an exception
                 # we catch it and ignore it.
@@ -200,7 +235,7 @@ class Server:
                 self.messages = "Error reading messages"
             self.messages = messages + self.messages
 
-            print("End ",str(len(result_sets)))
+            # print("End ",str(len(result_sets)))
 
             self.cur = None
 
@@ -242,7 +277,7 @@ class Server:
         if schema_name is None:
             schema_name='dbo'
         query = query.replace("$SCHEMANAME$", schema_name)
-        print(query)
+        # print(query)
         
         return self.query(query)[0].data[0][0]
 
