@@ -124,6 +124,12 @@ class tds_script_objectCommand(sublime_plugin.TextCommand):
                     # print(tdskit.xmlrpcclient.script_object(self.view.id(), None, s))
                     self.open_in_new_view(s, tdskit.xmlrpcclient.script_object(self.view.id(), None, s))
 
+class tds_sphelp_object(sublime_plugin.TextCommand):
+    def run(self, edit):
+        if is_connected(self.view):
+            if self.view.sel()[0]:
+                s = self.view.substr(self.view.sel()[0])
+                tdskit.xmlrpcclient.sphelp_object(self.view.id(), s)
 
 class MyEvents(sublime_plugin.EventListener):
 

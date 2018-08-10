@@ -1,0 +1,25 @@
+[
+    {
+        "caption": "TDSKit: Connect",
+        "command": "tds_connect"
+    },
+
+    {
+        "caption": "TDSKit: Script selected object",
+        "command": "tds_script_object"
+    },
+
+    {
+        "caption": "TDSKit: Execute selected query",
+        "command": "tds_query"
+    },
+
+    {
+        "caption": "TDSKit: sphelp selected object",
+        "command": "tds_sphelp_object"
+    },
+    {
+        "caption": "TDSKit: Cancel query",
+        "command": "tds_cancel_query"
+    }
+]

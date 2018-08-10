@@ -1,5 +1,6 @@
-TODO: Empty resultset look's like the query is still running
-TODO: Closing the last tab and reopen one give the following error : Service Error: Couldn't retrieve information about list control item -1.
-TODO: Cancel query
+DONE: Empty resultset look's like the query is still running
+DONE: Closing the last tab and reopen one give the following error : Service Error: Couldn't retrieve information about list control item -1.
+Mostly DONE: Cancel query. Canceling a query give some random error message
 TODO: handle GO statment
-TODO: statment that does not produce result throw an exception (ex select @toto = 'plop')
+DONE: statment that does not produce result throw an exception (ex select @toto = 'plop')
+

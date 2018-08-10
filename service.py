@@ -35,6 +35,12 @@ class tdsKitService:
         return "OK"
 
     def cancel(self, viewid):
+        srv = self.frame.views[viewid].srv
+        srv.cancel()
+        return "OK"
+
+    def sphelp_object(self, viewid, object_name):
+        wx.CallAfter(self.frame.execute_query_async,viewid,"sp_help '"+object_name+"'")
         return "OK"
 
     def ping(self):
