@@ -100,6 +100,10 @@ class Server:
         with self.conn.cursor() as cur:
             return cur.execute_scalar('select db_name()')
 
+    def get_instace(self):
+        with self.conn.cursor() as cur:
+            return cur.execute_scalar('select @@servername')
+
     def _get_databases(self):
         if self._databases is None:
             res = self.query("SELECT name FROM master.sys.databases")
@@ -139,7 +143,7 @@ class Server:
         batches = re.split("^\s*(GO(?:\s+[0-9]+)?)\s*(?:--.*)?$",sql,flags=re.M|re.I)
         # print(batches)
         for b in batches:
-            if b == "GO":
+            if b.upper() == "GO":
                 # execute one
                 query.append(last_query)
                 continue
