@@ -476,15 +476,21 @@ class QueryEditor(wx.Panel):
         if self.srv is not None:
             self.srv.close()
         self.srv = sql.Server(connection)
+        self.update_status()
         # print(sql.MetadataCache.servers)
+
+    def update_status(self):
+        self.xmlrpcclient.set_instance_info(self.viewid,"["+self.srv.get_instace()+"]["+self.srv.get_database()+"]")
 
     def _execute_async(self, query):
         result = self.srv.batched_query(query)
+        self.update_status()
         wx.CallAfter(self.set_result, result, self.srv.messages)
 
     def execute(self):
         query_text = self.texteditor.GetValue()
         result = self.srv.batched_query(query_text)
+        self.update_status()
         self.set_result(result, self.srv.messages)
 
     def execute_async(self, query):
@@ -497,6 +503,7 @@ class QueryEditor(wx.Panel):
         if self.is_running:
             self.srv.cancel()
             self.is_running = False
+        self.update_status()
 
     def OnKeyDown(self, e):
         # Exec

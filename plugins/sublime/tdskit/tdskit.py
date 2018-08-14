@@ -2,14 +2,55 @@ import sublime
 import sublime_plugin
 import xmlrpc.client
 import re
+from xmlrpc.server import SimpleXMLRPCServer
+from xmlrpc.server import SimpleXMLRPCRequestHandler
+
+class RequestHandler(SimpleXMLRPCRequestHandler):
+    rpc_paths = ('/RPC2',)
 
 class tdskit(object):
     xmlrpcclient = xmlrpc.client.ServerProxy('http://127.0.0.1:8000', allow_none=True)
 
+def get_view(viewid):
+    for w in sublime.windows():
+        for v in w.views():
+            if v.id() == viewid:
+                return v
+    return None
 
+class tdskitServiceClient:
+    def set_instance_info(self,viewid,message):
+        v=get_view(viewid)
+        if v is not None:
+            v.set_status("tdskit_instance_info",message)
 
 def plugin_unloaded():
     print("PluginUnLoaded")
+
+def plugin_loaded():
+    xmlrpcserver = SimpleXMLRPCServer(('127.0.0.1', 8001), requestHandler=RequestHandler, allow_none=True)
+    xmlrpcserver.register_introspection_functions()
+
+    # Register a function under a different name
+    def adder_function(x, y):
+        return x + y
+    xmlrpcserver.register_function(adder_function, 'add')
+
+    def set_info(viewid,message):
+        for w in sublime.windows():
+            for v in w.views():
+                if v.id() == viewid:
+                    v.set_status("info",message)
+                    return "OK"
+        return "KO"
+    xmlrpcserver.register_function(set_info, 'set_info')
+
+    xmlrpcserver.register_instance(tdskitServiceClient())
+    
+    # Run the server's main loop
+    sublime.set_timeout_async(lambda: xmlrpcserver.serve_forever(), 100)
+        
+
 
 
 def get_settings(key, default_value=None):
@@ -17,16 +58,16 @@ def get_settings(key, default_value=None):
     return settings.get(key, default_value)
 
 def is_connected(view):
-    print("Is_connected?")
+    #print("Is_connected?")
     try:
         if view.settings().get("tds_connection_info") is not None:
-            print("Try ping")
+            #print("Try ping")
             tdskit.xmlrpcclient.ping()
             return True
-        print("No")
+        #print("No")
         return False
     except:
-        print("No")
+        #print("No")
         view.settings().set("tds_connection_info",None)
         return False
 

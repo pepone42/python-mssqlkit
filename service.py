@@ -1,3 +1,4 @@
+import xmlrpc
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 import threading
@@ -82,8 +83,11 @@ class MainFrame(wx.Frame):
     def new_connection(self, viewid, server: str, instance: str=None, port: int = 1433,
                        database: str = "master", user: str = None, password: str = None):
         query = ui.QueryEditor(self.choicebook,False)
+        query.xmlrpcclient = xmlrpcclient
+        query.viewid = viewid
         conn = sql.ConnectionInfo(server,instance,port,database,user,password)
         query.connect(conn)
+
         self.delete_view(viewid)
         self.views[viewid] = query
         
@@ -134,6 +138,8 @@ def tdsKitService_stop():
 
 xmlrpcserver = SimpleXMLRPCServer(("localhost", 8000),
                             requestHandler=RequestHandler, allow_none=True)
+
+xmlrpcclient = xmlrpc.client.ServerProxy('http://127.0.0.1:8001', allow_none=True)
 
 app = wx.App()
 frame = MainFrame(title="TdsKit")
