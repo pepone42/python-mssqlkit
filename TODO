@@ -3,4 +3,4 @@ DONE: Closing the last tab and reopen one give the following error : Service Err
 Mostly DONE: Cancel query. Canceling a query give some random error message
 TODO: handle GO statment
 DONE: statment that does not produce result throw an exception (ex select @toto = 'plop')
-
+TODO: make autoCommit configurable by connection, not default?

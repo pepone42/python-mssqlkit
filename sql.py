@@ -79,6 +79,7 @@ class Server:
                     database=self.connection_info.database,
                     user=self.connection_info.user,
                     password=self.connection_info.password)
+        self.conn.set_autocommit(True)
         MetadataCache.new_server(self.dsn, self._get_databases(), self._get_sys_types())
 
     def close(self):
