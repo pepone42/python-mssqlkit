@@ -10,6 +10,7 @@
 			, "Instance" : "ProdInstanceName"
 			// Default database 
 			, "DefaultDatabase" : "Customer"
+			// If no username is specified, Windows authentication is used
 			},
 		{
 			"Name": "UAT server 2"
