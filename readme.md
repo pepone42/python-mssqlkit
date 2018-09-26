@@ -46,7 +46,7 @@ Todo
 Configure your prefered connection in tdskit.sublime-settings (Preferences -> Package setting -> tdskit -> Setting User)
 
 You can use the default configuration as a starting point:
-```json
+```javascript
 { 
 	// Available connection list
 	"Connections": 
